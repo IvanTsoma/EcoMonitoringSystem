@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Екологічний моніторинг міста</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <h1>Інтелектуальна система моніторингу екологічного стану міста</h1>
+    <form id="uploadForm">
+        <input type="file" name="file" id="file" required>
+        <button type="submit">Завантажити</button>
+    </form>
+
+    <div id="citySelection" style="display:none;">
+        <h2>Оберіть місто:</h2>
+        <select id="citySelect" multiple></select>
+        <button onclick="fetchData()">Показати</button>
+    </div>
+
+    <canvas id="chart" width="800" height="400"></canvas>
+
+    <script>
+        document.getElementById("uploadForm").addEventListener("submit", function(e){
+            e.preventDefault();
+            const formData = new FormData();
+            formData.append("file", document.getElementById("file").files[0]);
+            fetch("/upload", { method: "POST", body: formData })
+                .then(res => res.json())
+                .then(data => {
+                    const select = document.getElementById("citySelect");
+                    select.innerHTML = '';
+                    data.cities.forEach(city => {
+                        let opt = document.createElement("option");
+                        opt.value = city;
+                        opt.text = city;
+                        select.add(opt);
+                    });
+                    document.getElementById("citySelection").style.display = "block";
+                });
+        });
+
+        function fetchData(){
+            const cities = Array.from(document.getElementById("citySelect").selectedOptions).map(opt => opt.value);
+            const params = new URLSearchParams();
+            cities.forEach(c => params.append("cities[]", c));
+            fetch("/data?" + params.toString())
+                .then(res => res.json())
+                .then(data => {
+                    const labels = [...new Set(data.map(row => row.Year))];
+                    const datasets = ['PM2.5', 'NO2', 'CO2', 'GreenCover'].map(metric => ({
+                        label: metric,
+                        data: labels.map(year => {
+                            const filtered = data.filter(row => row.Year === year && row[metric] !== undefined);
+                            return filtered.length ? filtered[0][metric] : null;
+                        }),
+                        fill: false,
+                        borderColor: '#' + Math.floor(Math.random()*16777215).toString(16),
+                        tension: 0.1
+                    }));
+
+                    new Chart(document.getElementById('chart'), {
+                        type: 'line',
+                        data: { labels: labels, datasets: datasets },
+                        options: { responsive: true }
+                    });
+                });
+        }
+    </script>
+</body>
+</html>
